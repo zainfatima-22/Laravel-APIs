@@ -14,10 +14,11 @@ Route::get('ticket/users/{user_id}', [TicketController::class, 'userTicketsById'
 
 // Route for PUT (Edit) and PATCH (Update)
 Route::put('ticket/{ticket}', [TicketController::class, 'edit']);
-Route::patch('ticket/{ticket}', [TicketController::class, 'update']);
+Route::middleware('auth:sanctum')->patch('ticket/{ticket}', [TicketController::class, 'update']);
+Route::middleware('auth:sanctum')->post('/ticket', [TicketController::class, 'store']);
+
 
 Route::middleware('auth:sanctum')->group(function () {
-    
     // Custom Route 2: Show tickets belonging to the currently authenticated user
     // Endpoint: GET /api/v1/my-tickets
     Route::get('my-tickets', [TicketController::class, 'userTickets']);

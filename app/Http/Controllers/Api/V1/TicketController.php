@@ -11,9 +11,12 @@ use App\Models\Ticket;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Auth; 
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Gate;
 
 class TicketController extends ApisController
 {
+    use AuthorizesRequests;
     public function index(TicketFilter $filters)
     {
         return TicketResource::collection(Ticket::filter($filters)->paginate());
@@ -21,7 +24,6 @@ class TicketController extends ApisController
     public function userTickets(TicketFilter $filters)
     {
         $userId = Auth::id();
-        
         $tickets = Ticket::where('user_id', $userId)
                          ->filter($filters)
                          ->paginate();
@@ -47,7 +49,7 @@ class TicketController extends ApisController
     /**
      * Store a newly created resource in storage.
      */
-    public function store(StoreTicketRequest $request)
+/*      public function store(StoreTicketRequest $request)
     {
         try{
             $user = User::findorFail($request->input('data.relationships.author.data.id'));
@@ -61,9 +63,37 @@ class TicketController extends ApisController
             'description' => $request->input('data.attributes.description'),
             'status' => $request->input('data.attributes.status'),
             'user_id' => $request->input('data.relationships.author.data.id'),
+            'name' => $request->input('data.relationships.author.data.name'),
+            'role' => $request->input('data.relationships.author.data.role'),
         ];
         return new TicketResource(Ticket::create($model));
-    }
+    }  */
+    public function store(StoreTicketRequest $request)
+    {
+        Gate::define('create-ticket', function ($user) {
+            return $user->role === 'admin';
+        });
+
+        try {
+            $user = User::findOrFail($request->input('data.relationships.author.data.id'));
+        } catch (ModelNotFoundException $exception) {
+            return $this->ok('User not found!', [
+                "error" => "The provided user id doesn't exist"
+            ]);
+        }
+
+        $model = [
+            'title' => $request->input('data.attributes.title'),
+            'description' => $request->input('data.attributes.description'),
+            'status' => $request->input('data.attributes.status'),
+            'user_id' => $request->input('data.relationships.author.data.id'),
+            'name' => $request->input('data.relationships.author.data.name'),
+            'role' => $request->input('data.relationships.author.data.role')
+        ];
+
+        return new TicketResource(Ticket::create($model));
+    } 
+
 
     /**
      * Display the specified resource.
@@ -112,6 +142,7 @@ class TicketController extends ApisController
     {
         try{
             $ticket = Ticket::findorFail($ticket_id);
+            $this->authorize('update', $ticket);
             $validatedData = $request->validated();
             $model = [];
 
@@ -151,6 +182,7 @@ class TicketController extends ApisController
     {
         try{
             $ticket = Ticket::findorFail($ticket_id);
+            $this->authorize('delete', $ticket);
             $ticket->delete();
             return $this->ok('Ticket Successfully Deleted.');
         }catch(ModelNotFoundException $exception){
