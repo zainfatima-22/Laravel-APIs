@@ -216,15 +216,4 @@ class TicketControllerTest extends TestCase
 
         $this->assertDatabaseMissing('tickets', ['id' => $ticket->id]);
     }
-
-    public function testCanDelete(){
-        $ticket = Ticket::factory()->create(['user_id' => $this->admin->id]);
-
-        $response = $this->actingAs($this->admin,'sanctum') -> deleteJson("/api/v1/ticket/{$ticket->id}");
-
-        $response->assertOk()
-                 ->assertJson(["message"=> "Ticket Successfuly deleted."]);
-
-        $this->assertDatabaseMissing('tickets', ['id'=> $ticket->id]);
-    }
 }
