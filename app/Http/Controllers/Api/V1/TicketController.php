@@ -70,9 +70,7 @@ class TicketController extends ApisController
     }  */
     public function store(StoreTicketRequest $request)
     {
-        Gate::define('create-ticket', function ($user) {
-            return $user->role === 'admin';
-        });
+        
 
         try {
             $user = User::findOrFail($request->input('data.relationships.author.data.id'));
@@ -92,8 +90,7 @@ class TicketController extends ApisController
         ];
 
         return new TicketResource(Ticket::create($model));
-    } 
-
+    }
 
     /**
      * Display the specified resource.
