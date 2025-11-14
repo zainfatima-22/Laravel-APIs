@@ -87,32 +87,6 @@ class TicketControllerTest extends TestCase
         $this->assertDatabaseHas('tickets', ['title' => 'New Ticket']);
     }
 
-    /* public function testNonAdminCannotCreateTicket()
-    {
-        $payload = [
-            'data' => [
-                'attributes' => [
-                    'title' => 'Unauthorized Ticket',
-                    'description' => 'Should not be created',
-                    'status' => 'A',
-                ],
-                'relationships' => [
-                    'author' => [
-                        'data' => [
-                            'id' => $this->user->id,
-                            'name' => $this->user->name,
-                            'role' => $this->user->role,
-                        ]
-                    ]
-                ]
-            ]
-        ];
-
-        $response = $this->actingAs($this->user, 'sanctum')->postJson('/api/v1/ticket', $payload);
-
-        $response->assertForbidden();
-    } */
-
     public function testReturnsErrorIfUserNotFoundWhenCreatingTicket()
     {
         $payload = [
