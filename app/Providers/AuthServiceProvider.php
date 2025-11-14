@@ -22,7 +22,7 @@ class AuthServiceProvider extends ServiceProvider
     public function boot()
     {
         $this->registerPolicies();
-        Gate::define('create-ticket', function (User $user) {
+        Gate::define('create-ticket', function ($user) {
             return $user->role === 'admin';
         });
     }
