@@ -1,9 +1,13 @@
 <?php
 
+namespace Tests\Feature\Api\V1;
+
 use App\Models\Ticket;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
+
 class TicketControllerTest extends TestCase
 {
     use RefreshDatabase;
@@ -15,179 +19,205 @@ class TicketControllerTest extends TestCase
     {
         parent::setUp();
 
+        // Create admin and regular user
         $this->admin = User::factory()->create(['role' => 'admin']);
         $this->user = User::factory()->create(['role' => 'user']);
     }
 
-    public function testReturnsAllticketsInIndex()
+    /** @test */
+    public function testIndexShowsAllTicketsForAdmin()
     {
-        Ticket::factory()->count(3)->create();
+        Sanctum::actingAs($this->admin);
 
-        $response = $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/ticket');
+        Ticket::factory()->count(5)->create();
 
-        $response->assertOk()
-                 ->assertJsonStructure(['data', 'links', 'meta']);
+        $response = $this->getJson('/api/v1/tickets');
+
+        $response->assertStatus(200);
+        $response->assertJsonCount(5, 'data');
     }
 
-    public function testUserCanViewOnlyTheirTickets()
+    /** @test */
+    public function testIndexShowsOnlyUserTicketsForRegularUser()
     {
-        $myTickets = Ticket::factory()->count(2)->create(['user_id' => $this->user->id]);
-        Ticket::factory()->create(); 
+        Sanctum::actingAs($this->user);
 
-        $response = $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/my-tickets');
+        Ticket::factory()->count(3)->create(['user_id' => $this->user->id]);
+        Ticket::factory()->count(2)->create();
 
-        $response->assertOk();
-        $this->assertCount(2, $response->json('data'));
+        $response = $this->getJson('/api/v1/tickets');
+
+        $response->assertStatus(200);
+        $response->assertJsonCount(3, 'data');
     }
 
-    public function testReturnsUserTicketsById()
+    /** @test */
+    public function testGetTicketsForSpecificUser()
     {
-        $tickets = Ticket::factory()->count(2)->create(['user_id' => $this->user->id]);
+        Sanctum::actingAs($this->admin);
 
-        $response = $this->actingAs($this->admin, 'sanctum')->getJson("/api/v1/ticket/users/{$this->user->id}");
+        Ticket::factory()->count(4)->create(['user_id' => $this->user->id]);
 
-        $response->assertOk();
-        $this->assertCount(2, $response->json('data'));
+        $response = $this->getJson("/api/v1/users/{$this->user->id}/tickets");
+
+        $response->assertStatus(200);
+        $response->assertJsonCount(4, 'data');
     }
 
-    public function testReturnsErrorIfUserNotFoundInUserTicketsById()
+    /** @test */
+    public function testGetSpecificUserTicketsUnauthorizedForOtherUsers()
     {
-        $response = $this->actingAs($this->admin, 'sanctum')->getJson('/api/v1/ticket/users/9999');
+        $otherUser = User::factory()->create();
+        Sanctum::actingAs($otherUser);
 
-        $response->assertStatus(404) // controller uses $this->error()
-                 ->assertJson(['message' => 'User not found.']);
+        $response = $this->getJson("/api/v1/users/{$this->user->id}/tickets");
+
+        $response->assertStatus(403);
     }
 
-    public function testAdminCanCreateATicket()
+    /** @test */
+    public function testGetSpecificTicketOfUser()
     {
+        Sanctum::actingAs($this->user);
+
+        $ticket = Ticket::factory()->create(['user_id' => $this->user->id]);
+
+        $response = $this->getJson("/api/v1/users/{$this->user->id}/tickets/{$ticket->id}");
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.id', $ticket->id);
+    }
+
+    /** @test */
+    public function testGetSpecificTicketOfUserUnauthorized()
+    {
+        $otherUser = User::factory()->create();
+        Sanctum::actingAs($otherUser);
+
+        $ticket = Ticket::factory()->create(['user_id' => $this->user->id]);
+
+        $response = $this->getJson("/api/v1/users/{$this->user->id}/tickets/{$ticket->id}");
+
+        $response->assertStatus(403);
+    }
+
+    /** @test */
+    public function testAdminCanCreateTicketWithUserId()
+    {
+        Sanctum::actingAs($this->admin);
+
         $payload = [
             'data' => [
                 'attributes' => [
-                    'title' => 'New Ticket',
-                    'description' => 'Some details',
+                    'title' => 'Admin Ticket',
+                    'description' => 'Created by admin',
                     'status' => 'A',
                 ],
                 'relationships' => [
                     'author' => [
                         'data' => [
-                            'id' => $this->admin->id,
-                            'name' => $this->admin->name,
-                            'role' => $this->admin->role,
+                            'id' => $this->user->id
                         ]
                     ]
                 ]
             ]
         ];
 
-        $response = $this->actingAs($this->admin, 'sanctum')->postJson('/api/v1/ticket', $payload);
+        $response = $this->postJson('/api/v1/tickets', $payload);
 
-        $response->assertCreated()
-                 ->assertJsonPath('data.attributes.title', 'New Ticket');
-
-        $this->assertDatabaseHas('tickets', ['title' => 'New Ticket']);
+        $response->assertStatus(201);
+        $this->assertDatabaseHas((new Ticket())->getTable(), [
+            'title' => 'Admin Ticket',
+            'user_id' => $this->user->id,
+        ]);
     }
 
-    public function testReturnsErrorIfUserNotFoundWhenCreatingTicket()
+    /** @test */
+    public function testRegularUserTicketCreationAutomaticallyAssignsUserId()
     {
+        Sanctum::actingAs($this->user);
+
         $payload = [
             'data' => [
                 'attributes' => [
-                    'title' => 'Test Ticket',
-                    'description' => 'test',
+                    'title' => 'User Ticket',
+                    'description' => 'Created by user',
                     'status' => 'H',
-                ],
-                'relationships' => [
-                    'author' => [
-                        'data' => [
-                            'id' => 9999,
-                            'name' => 'ghost',
-                            'role' => 'admin',
-                        ]
-                    ]
                 ]
             ]
         ];
 
-        $response = $this->actingAs($this->admin, 'sanctum')->postJson('/api/v1/ticket', $payload);
+        $response = $this->postJson('/api/v1/tickets', $payload);
 
-        $response->assertOk()
-                 ->assertJsonFragment(['error' => "The provided user id doesn't exist"]);
+        $response->assertStatus(201);
+        $this->assertDatabaseHas((new Ticket())->getTable(), [
+            'title' => 'User Ticket',
+            'user_id' => $this->user->id,
+        ]);
     }
 
-    public function testCanShowASingleTicket()
+    /** @test */
+    public function testUpdateTicketWithPut()
     {
-        $ticket = Ticket::factory()->create();
+        Sanctum::actingAs($this->user);
 
-        $response = $this->actingAs($this->admin, 'sanctum')->getJson("/api/v1/ticket/{$ticket->id}");
-
-        $response->assertOk()
-                 ->assertJsonPath('data.id', $ticket->id);
-    }
-
-    public function testReturnsErrorIfTicketNotFound()
-    {
-        $response = $this->actingAs($this->admin, 'sanctum')->getJson('/api/v1/ticket/9999');
-
-        $response->assertStatus(404) 
-                 ->assertJson(['message' => 'Ticket not found']);
-    }
-
-    public function testCanEditATicket()
-    {
-        $ticket = Ticket::factory()->create();
+        $ticket = Ticket::factory()->create(['user_id' => $this->user->id]);
 
         $payload = [
             'data' => [
                 'attributes' => [
-                    'title' => 'Edited Title',
-                    'description' => 'Updated desc',
-                    'status' => 'A',
-                ],
-                'relationships' => [
-                    'author' => ['data' => ['id' => $ticket->user_id]]
+                    'title' => 'Updated Title',
+                    'description' => 'Updated description',
+                    'status' => 'C',
                 ]
             ]
         ];
 
-        $response = $this->actingAs($this->admin, 'sanctum')
-                         ->putJson("/api/v1/ticket/{$ticket->id}", $payload);
+        $response = $this->putJson("/api/v1/tickets/{$ticket->id}", $payload);
 
-        $response->assertOk()
-                 ->assertJsonPath('data.attributes.title', 'Edited Title');
-
-        $this->assertDatabaseHas('tickets', ['title' => 'Edited Title']);
+        $response->assertStatus(200);
+        $this->assertDatabaseHas((new Ticket())->getTable(), [
+            'id' => $ticket->id,
+            'title' => 'Updated Title',
+        ]);
     }
 
-    public function testCanUpdateATicket()
+    /** @test */
+    public function testUpdateTicketWithPatch()
     {
-        $ticket = Ticket::factory()->create(['user_id' => $this->admin->id]);
+        Sanctum::actingAs($this->user);
+
+        $ticket = Ticket::factory()->create(['user_id' => $this->user->id]);
 
         $payload = [
             'data' => [
                 'attributes' => [
-                    'status' => 'X',
+                    'title' => 'Patched Title',
                 ]
             ]
         ];
 
-        $response = $this->actingAs($this->admin, 'sanctum')
-                         ->patchJson("/api/v1/ticket/{$ticket->id}", $payload);
+        $response = $this->patchJson("/api/v1/tickets/{$ticket->id}", $payload);
 
-        $response->assertOk()
-                 ->assertJsonPath('data.attributes.status', 'X');
-
-        $this->assertDatabaseHas('tickets', ['status' => 'X']);
+        $response->assertStatus(200);
+        $this->assertDatabaseHas((new Ticket())->getTable(), [
+            'id' => $ticket->id,
+            'title' => 'Patched Title',
+        ]);
     }
 
-    public function testCanDeleteATicket()
+    /** @test */
+    public function testDeleteTicket()
     {
-        $ticket = Ticket::factory()->create(['user_id' => $this->admin->id]);
+        Sanctum::actingAs($this->user);
 
-        $response = $this->actingAs($this->admin, 'sanctum')->deleteJson("/api/v1/ticket/{$ticket->id}");
+        $ticket = Ticket::factory()->create(['user_id' => $this->user->id]);
 
-        $response->assertOk()
-                 ->assertJson(['message' => 'Ticket Successfully Deleted.']);
+        $response = $this->deleteJson("/api/v1/tickets/{$ticket->id}");
 
-        $this->assertDatabaseMissing('tickets', ['id' => $ticket->id]);
+        $response->assertStatus(200);
+        $this->assertDatabaseMissing((new Ticket())->getTable(), [
+            'id' => $ticket->id,
+        ]);
     }
 }

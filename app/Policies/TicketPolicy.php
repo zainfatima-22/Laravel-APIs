@@ -1,10 +1,8 @@
 <?php
-
 namespace App\Policies;
 
 use App\Models\Ticket;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
 class TicketPolicy
 {
@@ -13,7 +11,7 @@ class TicketPolicy
      */
     public function viewAny(User $user): bool
     {
-        return false;
+        return $user->role === 'admin';
     }
 
     /**
@@ -21,7 +19,9 @@ class TicketPolicy
      */
     public function view(User $user, Ticket $ticket): bool
     {
-        return false;
+        if ($user->role === 'admin') return true;
+
+        return $ticket->user_id === $user->id;
     }
 
     /**
@@ -29,7 +29,7 @@ class TicketPolicy
      */
     public function create(User $user): bool
     {
-        return false;
+        return true;
     }
 
     /**
@@ -37,13 +37,18 @@ class TicketPolicy
      */
     public function update(User $user, Ticket $ticket): bool
     {
+        if ($user->role === 'admin') return true;
+
         return $ticket->user_id === $user->id;
     }
+
     /**
      * Determine whether the user can delete the model.
      */
     public function delete(User $user, Ticket $ticket): bool
     {
+        if ($user->role === 'admin') return true;
+
         return $ticket->user_id === $user->id;
     }
 

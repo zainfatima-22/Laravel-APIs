@@ -7,6 +7,7 @@ use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvid
 use App\Models\Ticket;
 use App\Policies\TicketPolicy;
 use Illuminate\Support\Facades\Gate;
+use Laravel\Passport\Passport;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -18,12 +19,15 @@ class AuthServiceProvider extends ServiceProvider
     protected $policies = [
         Ticket::class => TicketPolicy::class,
     ];
-
     public function boot()
     {
         $this->registerPolicies();
+
+        Passport::routes();
         Gate::define('create-ticket', function ($user) {
             return $user->role === 'admin';
         });
+        Passport::enablePasswordGrant();
+
     }
 }
