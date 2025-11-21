@@ -19,4 +19,5 @@ Route::prefix('users/{user}')->group(function () {
 Route::group(['as' => 'api.'], function() {
     Orion::resource('ticket', TicketOrionController::class)->withSoftDeletes();
 });
+Route::post('tickets/batch-emails', [TicketController::class, 'sendBatchEmails']);
 

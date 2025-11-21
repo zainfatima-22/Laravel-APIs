@@ -51,13 +51,11 @@ trait ApiResponses
         return response()->json([
             'message' => $message,
             'data' => $data,
-            // Removed redundant 'status' key from payload
         ], $statuscode);
     }
 
     protected function errorResponse(string $message, array $data, int $statuscode): JsonResponse
     {
-        // Using 'error' key for failure payload consistency
         return response()->json([
             'message' => $message,
             'errors' => $data,

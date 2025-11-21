@@ -5,6 +5,7 @@ use App\Models\User;
 use App\Models\Ticket;
 use App\Notifications\TicketCreatedNotification;
 use Illuminate\Bus\Queueable;
+use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -12,7 +13,7 @@ use Illuminate\Queue\SerializesModels;
 
 class SendTicketCreatedEmailJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, Batchable;
     public Ticket $ticket;
     public $tries = 3;      
     public $backoff = [5, 30]; 
@@ -24,7 +25,7 @@ class SendTicketCreatedEmailJob implements ShouldQueue
             \Log::warning("SendTicketCreatedEmailJob: target user missing or has no email", ['ticket_id' => $this->ticket->id]);
             return;
         }
-        $user->notify(new TicketCreatedNotification($this->ticket));
+        $this->ticket->user->notify(new TicketCreatedNotification($this->ticket));
     }
     public function failed(\Throwable $exception)
     {
