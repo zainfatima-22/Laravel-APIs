@@ -1,5 +1,5 @@
 <?php
-
+App\Providers\HorizonServiceProvider::class;
 return [
 
     /*

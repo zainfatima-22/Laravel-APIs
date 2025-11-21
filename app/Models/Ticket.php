@@ -21,4 +21,10 @@ class Ticket extends Model
     public function scopeFilter(Builder $builder, QueryFilter $filters){
         return $filters->apply($builder);
     }
+    protected static function booted()
+    {
+        static::created(function ($ticket) {
+            dispatch(new \App\Jobs\SendTicketCreatedEmailJob($ticket));
+        });
+    }
 }

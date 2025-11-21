@@ -2,210 +2,187 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Http\Filters\V1\TicketFilter;
-use App\Http\Requests\Api\V1\EditTicketRequest;
+use App\Http\Requests\Api\V1\IndexTicketRequest;
 use App\Http\Requests\Api\V1\StoreTicketRequest;
 use App\Http\Requests\Api\V1\UpdateTicketRequest;
 use App\Http\Resources\V1\TicketResource;
+use App\Jobs\SendTicketCreatedEmailJob;
 use App\Models\Ticket;
 use App\Models\User;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
+use App\Traits\ApiResponses;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Auth\Access\AuthorizationException;
+use Spatie\QueryBuilder\QueryBuilder;
+use Spatie\QueryBuilder\AllowedFilter;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class TicketController extends ApisController
 {
-    use AuthorizesRequests;
-
-    /**
-     * Display a listing of the tickets.
-     * Admin sees all tickets, regular users see only their tickets.
-     */
-    public function index()
+    use AuthorizesRequests, ApiResponses;
+    protected array $allowedFilters;
+    protected array $allowedSorts;
+    public function __construct()
     {
-        $user = Auth::user();
+        // Now, initialize the properties inside a method
+        $this->allowedFilters = [
+            AllowedFilter::partial('title'),
+            AllowedFilter::exact('status'),
+            AllowedFilter::exact('user_id'),
+        ];
 
-        $query = Ticket::query();
+        $this->allowedSorts = [
+            'created_at',
+            'status',
+        ];
+    }
 
-        // Admin sees all tickets; users see only own tickets
-        if ($user->role !== 'admin') {
-            $query->where('user_id', $user->id);
+    public function index(IndexTicketRequest $request)
+    {
+        $this->authorize('viewAny', Ticket::class);
+
+        $authUser = Auth::user();
+        $query = Ticket::query()->with('user'); 
+
+        if (!$authUser->hasRole('admin')) {
+            $query->where('user_id', $authUser->id);
+            
+            if ($request->has('filter.user_id') && $request->input('filter.user_id') != $authUser->id) {
+                 return $this->forbidden('You are not authorized to view other users\' tickets.');
+            }
         }
 
-        // Apply custom TicketFilter
-        $tickets = (new TicketFilter(request()))
-            ->apply($query)
+        $tickets = QueryBuilder::for($query)
+            ->allowedFilters($this->allowedFilters)
+            ->allowedSorts($this->allowedSorts)
+            ->allowedIncludes(['user'])
             ->paginate()
-            ->appends(request()->query());
+            ->appends($request->query());
 
         return TicketResource::collection($tickets);
     }
-
     /**
-     * Get tickets by a specific user id.
+     * Get tickets for a specific user (GET /users/{user}/tickets).
      */
     public function getTicketsByUser(User $user)
     {
-        $authUser = Auth::user();
+        $this->authorize('viewUserTickets', [Ticket::class, $user]);
+        $query = $user->tickets()->with('user'); 
 
-        // Authorization: only admin or owner can view
-        if ($authUser->role !== 'admin' && $authUser->id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        // Get the underlying query builder from the relationship
-        $query = $user->tickets()->getQuery(); // <-- important fix
-
-        $tickets = (new TicketFilter(request()))
-            ->apply($query)
+        $tickets = QueryBuilder::for($query)
+            ->allowedFilters($this->allowedFilters)
+            ->allowedSorts($this->allowedSorts)
             ->paginate()
             ->appends(request()->query());
 
         return TicketResource::collection($tickets);
     }
 
+    /**
+     * Show a specific ticket.
+     */
+    public function show(Ticket $ticket) 
+    {
+        $ticket->load('user');
+        $this->authorize('view', $ticket); 
+
+        return new TicketResource($ticket);
+    }
 
     /**
-     * Get specific ticket of a user.
+     * Show a specific ticket for a given user (GET /users/{user}/tickets/{ticket}).
      */
     public function getSpecificTicketByUser(User $user, Ticket $ticket)
     {
-        $authUser = Auth::user();
-
-        // Authorization
-        if ($authUser->role !== 'admin' && $authUser->id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        // Ensure ticket belongs to the user
+        $this->authorize('viewUserTicket', [Ticket::class, $ticket, $user]);
         if ($ticket->user_id !== $user->id) {
-            return response()->json(['message' => 'Ticket not found for this user'], 404);
+            throw new ModelNotFoundException('Ticket not found for this user');
         }
 
         return new TicketResource($ticket->load('user'));
     }
 
     /**
-     * Store a newly created ticket.
+     * Store a new ticket.
      */
     public function store(StoreTicketRequest $request)
     {
-        $this->authorize('create', Ticket::class);
+        $authUser = Auth::user();
 
-        $userId = Auth::id();
-
-        if (Auth::user()->role === 'admin' && $request->input('data.relationships.author.data.id')) {
-            try {
-                $user = User::findOrFail($request->input('data.relationships.author.data.id'));
-                $userId = $user->id;
-            } catch (ModelNotFoundException $exception) {
-                return $this->ok('User not found!', [
-                    "error" => "The provided user id doesn't exist"
-                ]);
+        $requestedUserId = $request->input('data.relationships.author.data.id')
+            ?? $request->input('data.relationships.author.data.user_id');
+            
+            if ($authUser->hasRole('admin')) {
+            $targetUserId = $requestedUserId ?? $authUser->id;
+            if ($targetUserId !== $authUser->id) {
+                User::findOrFail($targetUserId);
             }
+        } else {
+            if ($requestedUserId && $requestedUserId != $authUser->id) {
+                throw new AuthorizationException('Non-admin users cannot assign tickets to other users.');
+            }
+            
+            $targetUserId = $authUser->id;
         }
+        
+        $this->authorize('create', Ticket::class); 
 
-        $model = [
-            'title' => $request->input('data.attributes.title'),
-            'description' => $request->input('data.attributes.description'),
-            'status' => $request->input('data.attributes.status'),
-            'user_id' => $userId,
-        ];
+        $ticketData = array_merge(
+            $request->validated(),
+            ['user_id' => $targetUserId]
+        );
 
-        return new TicketResource(Ticket::create($model));
+        $ticket = Ticket::create($ticketData);
+        SendTicketCreatedEmailJob::dispatch($ticket)->delay(now()->addSeconds(3));
+        return $this->created(
+            'Ticket created successfully',
+            (new TicketResource($ticket->load('user')))->response()->getData(true)
+        );
     }
 
-    /**
-     * Display a specific ticket.
-     */
-    public function show($ticket_id)
-    {
-        try {
-            $ticket = Ticket::findOrFail($ticket_id);
-            $this->authorize('view', $ticket);
-
-            if ($this->include('author')) {
-                return new TicketResource($ticket->load('user'));
-            }
-
-            return new TicketResource($ticket);
-        } catch (ModelNotFoundException $exception) {
-            return $this->error('Ticket not found');
-        }
-    }
 
     /**
-     * Edit a ticket.
-     */
-    public function edit(EditTicketRequest $request, $ticket_id)
-    {
-        try {
-            $ticket = Ticket::findOrFail($ticket_id);
-            $this->authorize('update', $ticket);
-
-            $model = [
-                'title' => $request->input('data.attributes.title'),
-                'description' => $request->input('data.attributes.description'),
-                'status' => $request->input('data.attributes.status'),
-            ];
-
-            if (Auth::user()->role === 'admin' && $request->input('data.relationships.author.data.id')) {
-                $model['user_id'] = $request->input('data.relationships.author.data.id');
-            }
-
-            $ticket->update($model);
-
-            return new TicketResource($ticket);
-        } catch (ModelNotFoundException $exception) {
-            return $this->ok('Ticket not found!', [
-                "error" => "The provided ticket id doesn't exist"
-            ]);
-        }
-    }
-
-    /**
-     * Update a ticket partially.
+     * Update a ticket.
      */
     public function update(UpdateTicketRequest $request, $ticket_id)
     {
+        $authUser = Auth::user();
+
         try {
-            $ticket = Ticket::findOrFail($ticket_id);
-            $this->authorize('update', $ticket);
+            $ticket = Ticket::with('user')->findOrFail($ticket_id);
+            $this->authorize('update', $ticket); 
+            $updateData = $request->input('data.attributes', []); 
 
-            $attributes = $request->input('data.attributes', []);
-            $model = [];
-
-            if (isset($attributes['title'])) $model['title'] = $attributes['title'];
-            if (isset($attributes['description'])) $model['description'] = $attributes['description'];
-            if (isset($attributes['status'])) $model['status'] = $attributes['status'];
-
-            if (Auth::user()->role === 'admin' && $request->input('data.relationships.author.data.id')) {
-                $model['user_id'] = $request->input('data.relationships.author.data.id');
+            if ($authUser->hasRole('admin')) {
+                $newUserId = $request->input('data.relationships.author.data.id');
+                
+                if ($newUserId) {
+                    $targetUser = User::findOrFail($newUserId); 
+                    $updateData['user_id'] = $targetUser->id;
+                }
+            }
+            
+            if (!empty($updateData)) {
+                $ticket->update($updateData);
             }
 
-            if (!empty($model)) $ticket->update($model);
+            return new TicketResource($ticket->load('user'));
 
-            return new TicketResource($ticket);
-        } catch (ModelNotFoundException $exception) {
-            return $this->ok('Ticket not found!', [
-                "error" => "The provided ticket id doesn't exist"
-            ]);
+        } catch (ModelNotFoundException $e) {
+            return $this->notFound('Resource or target user not found'); 
+
+        } catch (AuthorizationException $e) {
+            return $this->forbidden('Unauthorized to update this ticket.');
         }
     }
 
     /**
      * Delete a ticket.
      */
-    public function destroy($ticket_id)
+    public function destroy(Ticket $ticket) 
     {
-        try {
-            $ticket = Ticket::findOrFail($ticket_id);
-            $this->authorize('delete', $ticket);
-            $ticket->delete();
-
-            return $this->ok('Ticket Successfully Deleted.');
-        } catch (ModelNotFoundException $exception) {
-            return $this->error('Ticket not found');
-        }
+        $this->authorize('delete', $ticket); 
+        $ticket->delete();
+        return $this->ok('Ticket successfully deleted');
     }
 }
