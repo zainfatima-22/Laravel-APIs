@@ -22,11 +22,6 @@ class AuthServiceProvider extends ServiceProvider
     public function boot()
     {
         $this->registerPolicies();
-
-        Passport::routes();
-        Gate::define('create-ticket', function ($user) {
-            return $user->role === 'admin';
-        });
         Passport::enablePasswordGrant();
 
     }

@@ -15,6 +15,9 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        // Seed roles and permissions first
+        $this->call(RoleAndPermissionSeeder::class);
+
         $users = User::factory(10)->create();
         \App\Models\Ticket::factory(30)
         ->recycle($users)

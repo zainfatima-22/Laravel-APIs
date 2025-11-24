@@ -34,4 +34,7 @@ class SendTicketCreatedEmailJob implements ShouldQueue
             'error' => $exception->getMessage(),
         ]);
     }
+    public function failedd(){
+        error_clear_last();
+    }
 }

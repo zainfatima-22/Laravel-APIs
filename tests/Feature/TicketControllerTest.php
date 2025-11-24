@@ -19,27 +19,34 @@ class TicketControllerTest extends TestCase
     {
         parent::setUp();
 
-        // Create permissions
-        Permission::create(['name' => 'ticket_view']);
-        Permission::create(['name' => 'ticket_create']);
-        Permission::create(['name' => 'ticket_update']);
-        Permission::create(['name' => 'ticket_delete']);
+        // Create permissions WITH sanctum guard
+        Permission::create(['name' => 'ticket_view', 'guard_name' => 'sanctum']);
+        Permission::create(['name' => 'ticket_create', 'guard_name' => 'sanctum']);
+        Permission::create(['name' => 'ticket_update', 'guard_name' => 'sanctum']);
+        Permission::create(['name' => 'ticket_delete', 'guard_name' => 'sanctum']);
 
-        // Create roles
-        $adminRole = Role::create(['name' => 'admin']);
-        $userRole = Role::create(['name' => 'user']);
+        // Create roles WITH sanctum guard
+        $adminRole = Role::create(['name' => 'admin', 'guard_name' => 'sanctum']);
+        $userRole  = Role::create(['name' => 'user',  'guard_name' => 'sanctum']);
 
-        // Assign all permissions to both roles
-        $adminRole->givePermissionTo(['ticket_view', 'ticket_create', 'ticket_update', 'ticket_delete']);
-        $userRole->givePermissionTo(['ticket_view', 'ticket_create', 'ticket_update', 'ticket_delete']);
+        // Give permissions
+        $adminRole->givePermissionTo([
+            'ticket_view', 'ticket_create', 'ticket_update', 'ticket_delete'
+        ]);
 
-        // Create users and assign roles
-        $this->admin = User::factory()->create(['role' => 'admin']);
+        $userRole->givePermissionTo([
+            'ticket_view', 'ticket_create', 'ticket_update', 'ticket_delete'
+        ]);
+
+        // Create users
+        $this->admin = User::factory()->create();
+        $this->user  = User::factory()->create();
+
+        // Assign roles
         $this->admin->assignRole('admin');
-
-        $this->user  = User::factory()->create(['role' => 'user']);
         $this->user->assignRole('user');
     }
+
 
     /** @test */
     public function test_admin_sees_all_tickets()

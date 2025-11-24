@@ -9,13 +9,13 @@ use Illuminate\Database\Eloquent\Model;
 use Orion\Http\Requests\Request; 
 use Symfony\Component\HttpFoundation\Response; 
 
-// ... use statements (Request and Model)
-
 class TicketOrionController extends Controller
 {
     protected $model = Ticket::class;
     protected $policy = TicketPolicy::class;
     protected $jsonApi = true; 
+    protected $guard = 'sanctum';
+
     protected $fillable = ['title', 'description', 'status', 'user_id']; 
     protected $shouldReturnDeletedEntity = false;
     protected function beforeStore(Request $request, Model $ticket)
@@ -24,7 +24,7 @@ class TicketOrionController extends Controller
         
         $ticket->title = $attributes['title'] ?? null;
         $ticket->description = $attributes['description'] ?? null;
-        $ticket->status = $attributes['status'] ?? 'open'; // Use a default if possible
+        $ticket->status = $attributes['status'] ?? 'open'; 
         
         $ticket->user_id = $request->user()->id; 
     }
