@@ -31,4 +31,4 @@ Route::get('/v1/public/tickets/{id}', function ($id) {
 Route::middleware(['auth:api', SyncPermissionsOnToken::class])->get('/user', function (Request $request) {
     return $request->user();
 });
-Route::middleware(['auth:api', SyncPermissionsOnToken::class])->apiResource('ticketss', TicketController::class);
+Route::middleware(['auth:api', SyncPermissionsOnToken::class])->apiResource('ticketss', TicketController::class); 

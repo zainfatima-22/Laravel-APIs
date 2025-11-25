@@ -43,7 +43,7 @@ class TicketController extends ApisController
     {
         $tickets = Ticket::latest()->take(5)->get();
 
-        $jobs = $tickets->map(fn($ticket) => new SendTicketCreatedEmailJob($ticket))->toArray();
+        $jobs = $tickets->map(fn($ticket) => new SendTicketCreatedEmailJob($ticket->id))->toArray();
 
         $batch = Bus::batch($jobs)->dispatch();
 
@@ -128,13 +128,12 @@ class TicketController extends ApisController
     public function store(StoreTicketRequest $request)
     {
         $authUser = Auth::user();
-
         $requestedUserId = $request->input('data.relationships.author.data.id')
             ?? $request->input('data.relationships.author.data.user_id');
-
         try {
             if ($authUser->hasRole('admin')) {
                 $targetUserId = $requestedUserId ?? $authUser->id;
+
                 if ($targetUserId !== $authUser->id) {
                     User::findOrFail($targetUserId);
                 }
@@ -142,27 +141,29 @@ class TicketController extends ApisController
                 if ($requestedUserId && $requestedUserId != $authUser->id) {
                     throw new AuthorizationException('Non-admin users cannot assign tickets to other users.');
                 }
+
                 $targetUserId = $authUser->id;
             }
         } catch (ModelNotFoundException $e) {
             return $this->notFound('Target user not found.');
         }
-
-        $this->authorize('create', Ticket::class); 
+        $this->authorize('create', Ticket::class);
 
         $ticketData = array_merge(
             $request->validated(),
             ['user_id' => $targetUserId]
         );
-
         $ticket = Ticket::create($ticketData);
-        SendTicketCreatedEmailJob::dispatch($ticket)->delay(now()->addSeconds(3));
+        SendTicketCreatedEmailJob::dispatch($ticket->id)
+            ->delay(now()->addSeconds(2))
+            ->afterCommit();
 
         return $this->created(
             'Ticket created successfully',
             (new TicketResource($ticket->load('user')))->response()->getData(true)
         );
     }
+
 
     public function update(UpdateTicketRequest $request, $ticket_id)
     {

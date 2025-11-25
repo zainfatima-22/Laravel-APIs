@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Resources\V1\TicketResource;
 use Orion\Http\Controllers\Controller;
 use App\Models\Ticket;
 use App\Policies\TicketPolicy;
@@ -13,7 +14,8 @@ class TicketOrionController extends Controller
 {
     protected $model = Ticket::class;
     protected $policy = TicketPolicy::class;
-    protected $jsonApi = true; 
+    protected $resource = TicketResource::class;
+    // protected $jsonApi = true; 
     protected $guard = 'sanctum';
 
     protected $fillable = ['title', 'description', 'status', 'user_id']; 
@@ -37,6 +39,7 @@ class TicketOrionController extends Controller
         if (isset($attributes['description'])) $ticket->description = $attributes['description'];
         if (isset($attributes['status'])) $ticket->status = $attributes['status'];
     }
+
     public function destroy(Request $request, ...$args): Response
     {
         $key = $args[0]; 

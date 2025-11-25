@@ -15,6 +15,7 @@ class TicketResource extends JsonResource
     // public static $wrap = "ticket";
     public function toArray(Request $request): array
     {
+        // dd(34);
         return [
             'type' => 'ticket',
             'id' => $this->id,
