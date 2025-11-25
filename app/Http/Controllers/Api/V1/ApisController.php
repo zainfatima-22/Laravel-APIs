@@ -9,13 +9,21 @@ use Illuminate\Http\Request;
 class ApisController extends Controller
 {
     use ApiResponses;
-    public function include(string $relationship):bool{
-        $param = request()->get('include');
 
-        if(!isset($param)){
+    /**
+     * Check if a relationship should be included based on the 'include' query parameter.
+     */
+    public function include(string $relationship, ?Request $request = null): bool
+    {
+        $request = $request ?? request();
+        $param = $request->get('include');
+
+        if (!isset($param)) {
             return false;
         }
-        $includeValues = explode(',',strtolower( $param));
-        return in_array(strtolower($relationship), $includeValues);
+
+        $includeValues = explode(',', strtolower($param));
+
+        return in_array(strtolower($relationship), $includeValues, true);
     }
 }

@@ -4,6 +4,7 @@ namespace App\Http\Requests\Api\V1;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class StoreTicketRequest extends FormRequest
 {
@@ -41,10 +42,19 @@ class StoreTicketRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'title' => ['required', 'string', 'max:255'],
+            'title' => [
+                'required',
+                'string',
+                Rule::unique('tickets', 'title')->where(fn($query) => $query->where('user_id', $this->user()->id)),
+            ],
             'description' => ['required', 'string'],
             'status' => ['nullable', 'string', 'in:open,completed,pending,cancelled'],
             'user_id' => ['required', 'integer', 'exists:users,id'],
+        ];
+    }
+    public function messages(): array{
+        return [
+            'data.attributes.status' => 'The Status has incorrect value. Please use open, completed, pending, cancelled.'
         ];
     }
 }

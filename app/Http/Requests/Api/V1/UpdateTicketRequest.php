@@ -31,7 +31,7 @@ class UpdateTicketRequest extends FormRequest
     }
     public function messages(): array{
         return [
-            'data.attributes.status' => 'The data.attributes.status has incorrect value.'
+            'data.attributes.status' => 'The Status has incorrect value. Please use open, completed, pending, cancelled.'
         ];
     }
 }
