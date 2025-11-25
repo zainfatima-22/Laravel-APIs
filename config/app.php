@@ -1,5 +1,5 @@
 <?php
-
+App\Providers\HorizonServiceProvider::class;
 return [
 
     /*
@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'Laravel'),
+    'name' => env('APP_NAME', 'Ticket Management System'),
 
     /*
     |--------------------------------------------------------------------------
