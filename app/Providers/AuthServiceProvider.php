@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\User;
+use App\Policies\UserPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use App\Models\Ticket;
 use App\Policies\TicketPolicy;
@@ -18,6 +19,7 @@ class AuthServiceProvider extends ServiceProvider
      */
     protected $policies = [
         Ticket::class => TicketPolicy::class,
+        User::class => UserPolicy::class,
     ];
     public function boot()
     {

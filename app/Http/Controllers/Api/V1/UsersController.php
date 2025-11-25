@@ -6,26 +6,22 @@ use App\Http\Requests\Api\V1\StoreUserRequest;
 use App\Http\Requests\Api\V1\UpdateUserRequest;
 use App\Http\Resources\V1\UserResource;
 use App\Models\User;
+use App\Traits\ApiResponses;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class UsersController extends ApisController
 {
+    use AuthorizesRequests, ApiResponses;
     /**
-     * Display a listing of the resource.
+     * Display a paginated list of users.
      */
     public function index()
     {
-        if($this->include('tickets')){
-            return UserResource::collection(User::with('tickets')->paginate());
+        $query = User::query();
+        if ($this->include('tickets')) {
+            $query->with('tickets');
         }
-        return UserResource::collection(User::paginate());
-    }
-
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
+        return UserResource::collection($query->paginate());
     }
 
     /**
@@ -33,26 +29,20 @@ class UsersController extends ApisController
      */
     public function store(StoreUserRequest $request)
     {
-        //
-    }
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(User $user)
-    {
-        if($this->include('tickets')){
-            return new UserResource($user->load('tickets'));
-        }
+        $user = User::create($request->validated());
         return new UserResource($user);
     }
 
     /**
-     * Show the form for editing the specified resource.
+     * Display a single user resource.
      */
-    public function edit(User $user)
+    public function show(User $user)
     {
-        //
+        if ($this->include('tickets')) {
+            $user->load('tickets'); // Lazy load conditionally
+        }
+
+        return new UserResource($user);
     }
 
     /**
@@ -60,14 +50,16 @@ class UsersController extends ApisController
      */
     public function update(UpdateUserRequest $request, User $user)
     {
-        //
+        $user->update($request->validated());
+        return new UserResource($user);
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Remove the specified user.
      */
     public function destroy(User $user)
     {
-        //
+        $user->delete();
+        return $this->ok('User deleted successfully');
     }
 }

@@ -12,40 +12,35 @@ class TicketResource extends JsonResource
      *
      * @return array<string, mixed>
      */
-    // public static $wrap = "ticket";
     public function toArray(Request $request): array
     {
-        // dd(34);
         return [
             'type' => 'ticket',
             'id' => $this->id,
             'attributes' => [
                 'title' => $this->title,
                 'description' => $this->when(
-                    !$request->routeIs('ticket.index'),
+                    !$request->routeIs('tickets.index'), // optional: hide description in list
                     $this->description
                 ),
                 'status' => $this->status,
-                'created at' => $this->created_at,
-                'updated at' => $this->updated_at
+                'created_at' => $this->created_at,
+                'updated_at' => $this->updated_at,
             ],
             'relationships' => [
                 'author' => [
                     'data' => [
                         'type' => 'user',
-                        'id'=> $this->user_id,
-                        'name'=> $this->user->name,
-                        'role'=> $this->user->role
+                        'id' => $this->user_id,
                     ],
-                    /* 'links' => [
-                        'self' => route('users.show' , ['users' => $this->user_id])
-                    ] */
-                ] 
+                ],
             ],
-            'includes' => new UserResource($this->whenLoaded('user')),
+            'includes' => $this->whenLoaded('user', function () {
+                return new UserResource($this->user);
+            }),
             'links' => [
-                'self' => route('tickets.show' , ['ticket' => $this->id])
-            ]
+                'self' => route('tickets.show', ['ticket' => $this->id]),
+            ],
         ];
     }
 }

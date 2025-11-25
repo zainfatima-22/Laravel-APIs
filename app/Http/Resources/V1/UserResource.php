@@ -23,7 +23,8 @@ class UserResource extends JsonResource
                 $this->mergeWhen($request->routeIs('users.index'),[
                     'emailVerifiedAt' => $this->email_verified_at,
                     'createAt' => $this->created_at,
-                    'updatedAt'=> $this->updated_at
+                    'updatedAt'=> $this->updated_at,
+                    'role' => $this->role
                 ])
             ],
             'includes' => TicketResource::collection($this->whenLoaded('tickets')),
