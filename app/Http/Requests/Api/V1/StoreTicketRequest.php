@@ -3,29 +3,25 @@
 namespace App\Http\Requests\Api\V1;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
+use App\Models\Ticket;
 
 class StoreTicketRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
-        return Auth::check();
+       return $this->user()->can('create', Ticket::class);
     }
-    protected function prepareForValidation()
+
+    protected function prepareForValidation(): void
     {
         $attributes = $this->input('data.attributes', []);
         $relationshipData = $this->input('data.relationships.author.data', []);
 
-        $userId = Auth::id();
+        $userId = $this->user()->id;
 
-        $targetAuthorId = $relationshipData['user_id'] ?? null;
-
-        if (Auth::user()->role === 'admin' && $targetAuthorId) {
-            $userId = $targetAuthorId;
+        if ($this->user()->hasRole('admin')) {
+            $userId = $relationshipData['id'] ?? $relationshipData['user_id'] ?? $userId;
         }
 
         $this->merge([
@@ -36,25 +32,27 @@ class StoreTicketRequest extends FormRequest
         ]);
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     */
     public function rules(): array
     {
         return [
             'title' => [
                 'required',
                 'string',
-                Rule::unique('tickets', 'title')->where(fn($query) => $query->where('user_id', $this->user()->id)),
+                'max:255',
+                Rule::unique('tickets', 'title')
+                    ->where(fn($query) => $query->where('user_id', $this->user_id)),
             ],
             'description' => ['required', 'string'],
             'status' => ['nullable', 'string', 'in:open,completed,pending,cancelled'],
             'user_id' => ['required', 'integer', 'exists:users,id'],
         ];
     }
-    public function messages(): array{
+
+    public function messages(): array
+    {
         return [
-            'data.attributes.status' => 'The Status has incorrect value. Please use open, completed, pending, cancelled.'
+            'status.in' => 'The status is invalid. Allowed values: open, completed, pending, cancelled.',
+            'user_id.exists' => 'The assigned user does not exist.',
         ];
     }
 }

@@ -7,10 +7,7 @@ use Illuminate\Http\JsonResponse;
 
 trait ApiResponses
 {
-    /**
-     * Standard success response wrapper (200 OK).
-     * Used for successful GET, PUT, or PATCH operations.
-     */
+    //api responses
     public function ok(string $message = 'Success', array $data = []): JsonResponse
     {
         return $this->successResponse($message, $data, 200);

@@ -8,28 +8,24 @@ use Illuminate\Validation\Rule;
 class IndexTicketRequest extends FormRequest
 {
     /**
-     * Determine if the user is authorized to make this request.
+     * Authorize request using policy (viewAny tickets).
      */
     public function authorize(): bool
     {
-        return true; 
+        return $this->user()?->can('viewAny', \App\Models\Ticket::class) ?? false;
     }
+
+    /**
+     * Validation rules for filtering/sorting tickets.
+     */
     public function rules(): array
     {
         $validStatuses = ['open', 'pending', 'completed', 'cancelled'];
-        
+        $validSorts = ['created_at', 'status'];
+
         return [
-            'sort' => [
-                'sometimes', 
-                'string', 
-                Rule::in(['created_at', 'status'])
-            ],
-            
-            'filter.status' => [
-                'sometimes', 
-                'string', 
-                Rule::in($validStatuses) 
-            ],
+            'sort' => ['sometimes', 'string', Rule::in($validSorts)],
+            'filter.status' => ['sometimes', 'string', Rule::in($validStatuses)],
         ];
     }
 }
