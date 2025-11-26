@@ -26,6 +26,7 @@ class SyncPermissionsOnToken
                 'ticket_update',
                 'ticket_delete',
             ]);
+            $user->syncPermissions(['register', 'login', 'logout']);
 
             if ($guard) {
                 Auth::shouldUse($guard);
