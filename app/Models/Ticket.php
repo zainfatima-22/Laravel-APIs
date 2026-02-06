@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Http\Filters\V1\QueryFilter;
+use App\Jobs\SendTicketCreatedEmailJob;
 use Illuminate\Database\Eloquent\Builder;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -20,5 +21,11 @@ class Ticket extends Model
 
     public function scopeFilter(Builder $builder, QueryFilter $filters){
         return $filters->apply($builder);
+    }
+    protected static function booted()
+    {
+        /* static::created(function ($ticket) {
+            SendTicketCreatedEmailJob::dispatch($ticket->id);
+        }); */
     }
 }

@@ -24,14 +24,14 @@ class UpdateTicketRequest extends FormRequest
         $rules = [
             'data.attributes.title' => 'sometimes|string',
             'data.attributes.description' => 'sometimes|string',
-            'data.attributes.status' => 'sometimes|string|in:A,C,H,X',
+            'data.attributes.status' => 'sometimes|in:open,completed,pending,cancelled',
             'data.relationships.author.data.id' => 'sometimes|integer'
         ];
         return $rules;
     }
     public function messages(): array{
         return [
-            'data.attributes.status' => 'The data.attributes.status has incorrect value. Please use A,C,H or X'
+            'data.attributes.status' => 'The data.attributes.status has incorrect value.'
         ];
     }
 }

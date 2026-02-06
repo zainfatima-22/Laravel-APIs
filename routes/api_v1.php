@@ -15,8 +15,9 @@ Route::get('user', function (Request $request) {
 Route::prefix('users/{user}')->group(function () {
         Route::get('tickets', [TicketController::class, 'getTicketsByUser']); 
         Route::get('tickets/{ticket}', [TicketController::class, 'getSpecificTicketByUser']); 
-});
+}); 
+Route::middleware('auth:sanctum')
+    ->group(function () {
+        Orion::resource('ticket', TicketController::class);
+    });
 
-/* Route::middleware('auth:sanctum')->group(function () {
-    Orion::resource('tickets', TicketOrionController::class);
-}); */

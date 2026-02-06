@@ -6,65 +6,46 @@ use App\Models\User;
 
 class TicketPolicy
 {
-    /**
-     * Determine whether the user can view any models.
-     */
+    public function before(User $user, $ability): ?bool
+    {
+        if ($user->hasRole('admin')) {
+            return true;
+        }
+        return null;
+    }
+
     public function viewAny(User $user): bool
     {
-        return $user->role === 'admin';
+        return $user->can('ticket_view');
     }
 
-    /**
-     * Determine whether the user can view the model.
-     */
-    public function view(User $user, Ticket $ticket): bool
-    {
-        if ($user->role === 'admin') return true;
-
-        return $ticket->user_id === $user->id;
-    }
-
-    /**
-     * Determine whether the user can create models.
-     */
     public function create(User $user): bool
     {
-        return true;
+        return $user->can('ticket_create');
     }
 
-    /**
-     * Determine whether the user can update the model.
-     */
+    public function view(User $user, Ticket $ticket): bool
+    {
+        return $user->can('ticket_view') && $ticket->user_id === $user->id;
+    }
+
     public function update(User $user, Ticket $ticket): bool
     {
-        if ($user->role === 'admin') return true;
-
-        return $ticket->user_id === $user->id;
+        return $user->can('ticket_update') && $ticket->user_id === $user->id;
     }
 
-    /**
-     * Determine whether the user can delete the model.
-     */
     public function delete(User $user, Ticket $ticket): bool
     {
-        if ($user->role === 'admin') return true;
-
-        return $ticket->user_id === $user->id;
+        return $user->can('ticket_delete') && $ticket->user_id === $user->id;
     }
-
-    /**
-     * Determine whether the user can restore the model.
-     */
-    public function restore(User $user, Ticket $ticket): bool
+    public function viewUserTickets(User $authUser, User $user): bool
     {
-        return false;
+        return $authUser->id === $user->id;
     }
-
-    /**
-     * Determine whether the user can permanently delete the model.
-     */
-    public function forceDelete(User $user, Ticket $ticket): bool
+    public function viewUserTicket(User $authUser, Ticket $ticket, User $user): bool
     {
-        return false;
+        return $authUser->can('ticket_view') 
+               && $ticket->user_id === $authUser->id 
+               && $user->id === $authUser->id;
     }
 }

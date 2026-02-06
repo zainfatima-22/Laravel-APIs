@@ -22,7 +22,7 @@ class TicketFactory extends Factory
             'user_id' => User::factory(),
             'title' => fake()->words(4, true),
             'description' => fake()->paragraph(),
-            'status' => fake()->randomElement(['A', 'C', 'H', 'X'])
+            'status' => fake()->randomElement(['open','completed','pending','cancelled',])
         ];
     }
 }

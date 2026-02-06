@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Api\V1;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Auth;
 
 class StoreTicketRequest extends FormRequest
 {
@@ -11,26 +12,39 @@ class StoreTicketRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return true;
+        return Auth::check();
+    }
+    protected function prepareForValidation()
+    {
+        $attributes = $this->input('data.attributes', []);
+        $relationshipData = $this->input('data.relationships.author.data', []);
+
+        $userId = Auth::id();
+
+        $targetAuthorId = $relationshipData['user_id'] ?? null;
+
+        if (Auth::user()->role === 'admin' && $targetAuthorId) {
+            $userId = $targetAuthorId;
+        }
+
+        $this->merge([
+            'title' => $attributes['title'] ?? null,
+            'description' => $attributes['description'] ?? null,
+            'status' => $attributes['status'] ?? 'open',
+            'user_id' => $userId,
+        ]);
     }
 
     /**
      * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
         return [
-            'data.attributes.title' => 'required|string',
-            'data.attributes.description' => 'required|string',
-            'data.attributes.status' => 'required|string|in:A,C,H,X',
-            'data.relationships.author.data.id' => 'integer',
-        ];
-    }
-    public function messages(): array{
-        return [
-            'data.attributes.status' => 'The data.attributes.status has incorrect value. Please use A,C,H or X'
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['required', 'string'],
+            'status' => ['nullable', 'string', 'in:open,completed,pending,cancelled'],
+            'user_id' => ['required', 'integer', 'exists:users,id'],
         ];
     }
 }
